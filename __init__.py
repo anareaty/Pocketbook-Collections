@@ -17,7 +17,7 @@ class PocketbookCollectionsAction(InterfaceActionBase):
     supported_platforms     = ['windows', 'osx', 'linux']
     author                  = 'anareaty'
     version                 = PLUGIN_VERSION_TUPLE
-    minimum_calibre_version = (3, 48, 0)
+    minimum_calibre_version = (6, 0, 0)
 
     actual_plugin           = 'calibre_plugins.pocketbook_collections.ui:InterfacePlugin'
 
