@@ -1,3 +1,7 @@
+__license__   = 'GPL v3'
+__copyright__ = '2024, Anareaty <reatymain@gmail.com>'
+__docformat__ = 'restructuredtext en'
+
 
 import json
 import sqlite3 as sqlite
