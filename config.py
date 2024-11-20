@@ -1,3 +1,7 @@
+__license__   = 'GPL v3'
+__copyright__ = '2024, Anareaty <reatymain@gmail.com>'
+__docformat__ = 'restructuredtext en'
+
 from qt.core import QVBoxLayout, QLabel, QLineEdit, QWidget
 from calibre.utils.config import JSONConfig
 
