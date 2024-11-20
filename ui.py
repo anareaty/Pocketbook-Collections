@@ -1,3 +1,7 @@
+__license__   = 'GPL v3'
+__copyright__ = '2024, Anareaty <reatymain@gmail.com>'
+__docformat__ = 'restructuredtext en'
+
 
 from calibre.gui2.actions import InterfaceAction
 from calibre_plugins.pocketbook_collections.__init__ import PLUGIN_NAME
