@@ -6,7 +6,7 @@ __docformat__ = 'restructuredtext en'
 from calibre.customize import InterfaceActionBase
 
 PLUGIN_NAME = 'Pocketbook Collections'
-PLUGIN_VERSION_TUPLE = (1, 0, 0)
+PLUGIN_VERSION_TUPLE = (1, 1, 0)
 PLUGIN_VERSION = '.'.join([str(x) for x in PLUGIN_VERSION_TUPLE])
 
 
@@ -17,7 +17,7 @@ class PocketbookCollectionsAction(InterfaceActionBase):
     supported_platforms     = ['windows', 'osx', 'linux']
     author                  = 'anareaty'
     version                 = PLUGIN_VERSION_TUPLE
-    minimum_calibre_version = (6, 0, 0)
+    minimum_calibre_version = (3, 48, 0)
 
     actual_plugin           = 'calibre_plugins.pocketbook_collections.ui:InterfacePlugin'
 
