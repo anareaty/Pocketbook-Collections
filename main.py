@@ -3,7 +3,7 @@ __copyright__ = '2024, Anareaty <reatymain@gmail.com>'
 __docformat__ = 'restructuredtext en'
 
 
-import json
+import json, time
 import sqlite3 as sqlite
 from contextlib import closing
 from calibre.library import db as calibre_db
@@ -131,7 +131,11 @@ def sync_metadata(data, command, done_msg):
 
                     # Find the timestamp of the last modification in Calibre
                     lastMod = calibreAPI.field_for("last_modified", calibre_book_ID)
-                    lastModTS = int(lastMod.timestamp())
+                    try:
+                        lastModTS = int(lastMod.timestamp())
+                    except:
+                        lastModTS = int(time.mktime(lastMod.timetuple()))
+                    
                     
                     
                     # Run functions to send or load selected metadata based on specified command
