@@ -2,7 +2,14 @@ __license__   = 'GPL v3'
 __copyright__ = '2024, Anareaty <reatymain@gmail.com>'
 __docformat__ = 'restructuredtext en'
 
-from qt.core import QVBoxLayout, QLabel, QLineEdit, QWidget
+try:
+    from qt.core import QVBoxLayout, QLabel, QLineEdit, QWidget
+except:
+    try:
+        from PyQt5.Qt import QVBoxLayout, QLabel, QLineEdit, QWidget
+    except:
+        from PyQt4.Qt import QVBoxLayout, QLabel, QLineEdit, QWidget
+
 from calibre.utils.config import JSONConfig
 
 prefs = JSONConfig('plugins/pocketbook_collections')
