@@ -7,8 +7,15 @@ from calibre.gui2.actions import InterfaceAction
 from calibre_plugins.pocketbook_collections.__init__ import PLUGIN_NAME
 from calibre_plugins.pocketbook_collections.config import prefs
 from calibre.gui2 import error_dialog
-from qt.core import QMenu
 import os
+
+try:
+    from qt.core import QMenu
+except:
+    try:
+        from PyQt5.Qt import QMenu
+    except:
+        from PyQt4.Qt import QMenu
 
 
 
