@@ -150,15 +150,17 @@ class InterfacePlugin(InterfaceAction):
     def sync_done(self, job):
         to_load, done_msg = job.result
 
+        print("start updating Calibre metadata")
+
         for obj in to_load["read"]:
-            print("read")
-            print(obj)
+            #print("read")
+            #print(obj)
             self.gui.current_db.new_api.set_field(prefs["read_lookup_name"], obj)
             self.gui.iactions['Edit Metadata'].refresh_gui(list(obj.keys()), covers_changed=False)
 
         for obj in to_load["fav"]:
-            print("fav")
-            print(obj)
+            #print("fav")
+            #print(obj)
             self.gui.current_db.new_api.set_field(prefs["fav_lookup_name"], obj)
             self.gui.iactions['Edit Metadata'].refresh_gui(list(obj.keys()), covers_changed=False)
 

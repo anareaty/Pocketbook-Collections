@@ -215,6 +215,10 @@ def send_collections(data, db, calibreAPI, calibre_book_ID, reader_book_ID, last
             readerBookShelfID = shelf_dicts["shelfsNameToReader"][calibreBookShelfName]
 
 
+            print(calibreBookShelfName)
+            print(readerBookShelfID)
+
+
             # If the collection in reader does not exist we must create it
             if readerBookShelfID == None:
                 # First create the collection itself
@@ -473,6 +477,8 @@ def load_collections(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
 # Instead we collect all the data that need to be updated and return it to later update in sync_done function in ui module.
 
 def load_read_status(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
+
+    print("load read statuses")
     
     to_load_read = None
 
@@ -485,11 +491,21 @@ def load_read_status(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
 
         # If status exist, check the status in Calibre
 
+        print(statusRow)
+
+        read = calibreAPI.field_for(prefs["read_lookup_name"], calibre_book_ID)
+        completed = "0"
+        if read: 
+            completed = "1"
+
         if statusRow:
-            read = calibreAPI.field_for(prefs["read_lookup_name"], calibre_book_ID)
-            completed = "0"
-            if read: 
-                completed = "1"
+            
+
+            print(reader_book_ID)
+            print("calibre completed")
+            print(completed)
+            print("reader completed")
+            print(statusRow["completed"])
 
             # If status in Calibre is different from reader,  save status to update Calibre
             if completed != str(statusRow["completed"]):
@@ -503,7 +519,7 @@ def load_read_status(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
                 to_load_read = {calibre_book_ID: read}
                 
         # If status in reader not exist delete status in Calibre
-        else:
+        elif completed == "1":
             to_load_read = {calibre_book_ID: None}
         
     return to_load_read
@@ -528,12 +544,13 @@ def load_favorite_status(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
 
         # If status exist, check the status in Calibre
 
-        if statusRow:
-            fav = calibreAPI.field_for(prefs["fav_lookup_name"], calibre_book_ID)
-            favorite = "0"
-            if fav: 
-                favorite = "1"
+        fav = calibreAPI.field_for(prefs["fav_lookup_name"], calibre_book_ID)
+        favorite = "0"
+        if fav: 
+            favorite = "1"
 
+        if statusRow:
+            
             # If status in Calibre is different from reader,  save status to update Calibre
             if favorite != str(statusRow["favorite"]):
                 favorite = str(statusRow["favorite"])
@@ -546,7 +563,7 @@ def load_favorite_status(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
                 to_load_fav = {calibre_book_ID: fav}
 
         # If status in reader not exist delete status in Calibre
-        else:
+        elif favorite == "1":
             to_load_fav = {calibre_book_ID: None}
 
     return to_load_fav
@@ -574,19 +591,23 @@ def load_statuses(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
 
         # If at least one status exist, check statuses in Calibre
 
+        completed = "0"
+        favorite = "0"
+
+        if data["has_read_column"]:
+            read = calibreAPI.field_for(prefs["read_lookup_name"], calibre_book_ID)
+            if read: 
+                completed = "1"
+
+        if data["has_fav_column"]:
+            fav = calibreAPI.field_for(prefs["fav_lookup_name"], calibre_book_ID)
+            if fav: 
+                favorite = "1"
+
         if statusRow:
-            completed = "0"
-            favorite = "0"
+            
 
-            if data["has_read_column"]:
-                read = calibreAPI.field_for(prefs["read_lookup_name"], calibre_book_ID)
-                if read: 
-                    completed = "1"
-
-            if data["has_fav_column"]:
-                fav = calibreAPI.field_for(prefs["fav_lookup_name"], calibre_book_ID)
-                if fav: 
-                    favorite = "1"
+            
 
             loadStatusFromDevice = False
 
@@ -616,8 +637,10 @@ def load_statuses(data, db, calibreAPI, calibre_book_ID, reader_book_ID):
         
         # If statuses in reader not exist delete status in Calibre
         else:
-            to_load_statuses["read"] = {calibre_book_ID: None}
-            to_load_statuses["fav"] = {calibre_book_ID: None}
+            if completed == "1":
+                to_load_statuses["read"] = {calibre_book_ID: None}
+            if favorite == "1":
+                to_load_statuses["fav"] = {calibre_book_ID: None}
 
 
     return to_load_statuses
