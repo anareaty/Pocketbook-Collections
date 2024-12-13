@@ -6,7 +6,7 @@ __docformat__ = 'restructuredtext en'
 from calibre.customize import InterfaceActionBase
 
 PLUGIN_NAME = 'Pocketbook Collections'
-PLUGIN_VERSION_TUPLE = (1, 1, 2)
+PLUGIN_VERSION_TUPLE = (2, 0, 0)
 PLUGIN_VERSION = '.'.join([str(x) for x in PLUGIN_VERSION_TUPLE])
 
 
@@ -26,7 +26,7 @@ class PocketbookCollectionsAction(InterfaceActionBase):
 
     def config_widget(self):
         from calibre_plugins.pocketbook_collections.config import ConfigWidget
-        return ConfigWidget()
+        return ConfigWidget(self.actual_plugin_)
 
     def save_settings(self, config_widget):
         config_widget.save_settings()

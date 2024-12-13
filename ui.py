@@ -6,6 +6,7 @@ __docformat__ = 'restructuredtext en'
 from calibre.gui2.actions import InterfaceAction
 from calibre_plugins.pocketbook_collections.__init__ import PLUGIN_NAME
 from calibre_plugins.pocketbook_collections.config import prefs
+from calibre.devices.usbms.driver import debug_print
 from calibre.gui2 import error_dialog
 import os
 
@@ -25,7 +26,13 @@ PLUGIN_ICONS = ['images/pocketbook.png',
                 'images/config.png', 
                 'images/catalog.png', 
                 'images/ok.png', 
-                'images/donate.png']
+                'images/heart.png',
+                'images/auto-reload.png',
+                'images/rating.png',
+                'images/edit_input.png',
+                'images/edit-redo.png',
+                'images/highlight.png'
+                ]
 
 
 
@@ -54,122 +61,177 @@ class InterfacePlugin(InterfaceAction):
         self.has_read_column = prefs["read_lookup_name"] in fm and fm[prefs["read_lookup_name"]]['datatype'] == 'bool'
         self.has_fav_column = prefs["fav_lookup_name"] in fm and fm[prefs["fav_lookup_name"]]['datatype'] == 'bool'
         self.has_shelf_column = prefs["shelf_lookup_name"] in fm and fm[prefs["shelf_lookup_name"]]['datatype'] == 'text'
+        #self.has_pb_position_column = prefs["pb_position_lookup_name"] in fm and fm[prefs["pb_position_lookup_name"]]['datatype'] in ["text", "comments"]
+        #self.has_cr3_position_column = prefs["cr3_position_lookup_name"] in fm and fm[prefs["cr3_position_lookup_name"]]['datatype'] in ["text", "comments"]
+        
+        self.has_an_column = prefs["an_lookup_name"] in fm and fm[prefs["an_lookup_name"]]['datatype'] == 'comments'
 
         main_menu = self.menu
         main_menu.clear()
         
         self.qaction.setIcon(self.get_icon('pocketbook'))
 
-        main_menu.addAction(self.get_icon('forward'), ('Send all metadata to Pocketbook'), self.send_all_command)
+        main_menu.addAction(self.get_icon('forward'), ('Send all metadata to Pocketbook'), self.send_all)
         sendMenu = main_menu.addMenu(('Send selected'))
-        sendMenu.addAction(self.get_icon('catalog'), ('Send collections'), self.send_collections_command)
-        sendMenu.addAction(self.get_icon('ok'), ('Send read statuses'), self.send_read_command)
-        sendMenu.addAction(self.get_icon('donate'), ('Send favorite statuses'), self.send_favorite_command)
+        sendMenu.addAction(self.get_icon('catalog'), ('Send collections'), self.send_collections)
+        sendMenu.addAction(self.get_icon('ok'), ('Send read statuses'), self.send_read)
+        sendMenu.addAction(self.get_icon('heart'), ('Send favorite statuses'), self.send_favorite)
+        sendMenu.addAction(self.get_icon('rating'), ('Send ratings (KOReader)'), self.send_ratings)
+        sendMenu.addAction(self.get_icon('edit_input'), ('Send reviews (KOReader)'), self.send_reviews)
 
-        main_menu.addAction(self.get_icon('back'), ('Load all metadata from Pocketbook'), self.load_all_command)
+        main_menu.addAction(self.get_icon('back'), ('Load all metadata from Pocketbook'), self.load_all)
         loadMenu = main_menu.addMenu(('Load selected'))
-        loadMenu.addAction(self.get_icon('catalog'), ('Load collections'), self.load_collections_command)
-        loadMenu.addAction(self.get_icon('ok'), ('Load read statuses'), self.load_read_command)
-        loadMenu.addAction(self.get_icon('donate'), ('Load favorite statuses'), self.load_favorite_command)
+        loadMenu.addAction(self.get_icon('catalog'), ('Load collections'), self.load_collections)
+        loadMenu.addAction(self.get_icon('ok'), ('Load read statuses'), self.load_read)
+        loadMenu.addAction(self.get_icon('heart'), ('Load favorite statuses'), self.load_favorite)
+        loadMenu.addAction(self.get_icon('rating'), ('Load ratings (KOReader)'), self.load_ratings)
+        loadMenu.addAction(self.get_icon('edit_input'), ('Load reviews (KOReader)'), self.load_reviews)
+
+        main_menu.addAction(self.get_icon('highlight'), ('Extract annotations'), self.extract_annotations)
+
+        main_menu.addAction(self.get_icon('auto-reload'), ('Sync reading positions'), self.sync_position)
+        main_menu.addAction(self.get_icon('edit-redo'), ('Force update reading positions from Calibre'), self.force_position)
+
+        
 
         main_menu.addAction(self.get_icon('config'), ('Configure plugin'), self.open_settings)
         
     
     # Menu commands functions
 
-    def send_all_command(self):
-        if self.has_shelf_column or self.has_fav_column or self.has_read_column:
-            self.run_sync_job("send all", "Sending all metadata to Pocketbook", "All statuses and collections have been sent to Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not send metadata", "Columns " + prefs["shelf_lookup_name"] + ", " + prefs["read_lookup_name"] + " and " + prefs["fav_lookup_name"] + " do not exist", show=True)
+    def send_all(self):
+        self.run_sync_job("send_all", "Sending all metadata to Pocketbook")
 
-    def send_collections_command(self):
-        if self.has_shelf_column:
-            self.run_sync_job("send collections", "Sending collections to Pocketbook", "All collections have been sent to Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not send collections", "Column " + prefs["shelf_lookup_name"] + " does not exist", show=True)
-        
-    def send_read_command(self):
-        if self.has_read_column:
-            self.run_sync_job("send read", "Sending read statuses to Pocketbook", "All read statuses have been sent to Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not send read statuses", "Column " + prefs["read_lookup_name"] + " does not exist", show=True)
 
-    def send_favorite_command(self):
-        if self.has_fav_column:
-            self.run_sync_job("send favorite", "Sending favorite statuses to Pocketbook", "All favorite statuses have been sent to Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not send favorite statuses", "Column " + prefs["fav_lookup_name"] + " does not exist", show=True)
+    def send_collections(self):
+        self.run_sync_job("send_collections", "Sending collections to Pocketbook")
+ 
 
-    def load_all_command(self):
-        if self.has_shelf_column or self.has_fav_column or self.has_read_column:
-            self.run_sync_job("load all", "Loading all metadata from Pocketbook", "All statuses and collections have been loaded from Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not load metadata", "Columns " + prefs["shelf_lookup_name"] + ", " + prefs["read_lookup_name"] + " and " + prefs["fav_lookup_name"] + " do not exist", show=True)
-        
-    def load_collections_command(self):
-        if self.has_shelf_column:
-            self.run_sync_job("load collections", "Loading collections from Pocketbook", "All collections have been loaded from Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not load collections", "Column " + prefs["shelf_lookup_name"] + " does not exist", show=True)
-        
-    def load_read_command(self):
-        if self.has_read_column:
-            self.run_sync_job("load read", "Loading read statuses from Pocketbook", "All read statuses have been loaded from Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not load read statuses", "Column " + prefs["read_lookup_name"] + " does not exist", show=True)
-        
-    def load_favorite_command(self):
-        if self.has_fav_column:
-            self.run_sync_job("load favorite", "Loading favorite statuses from Pocketbook", "All favorite statuses have been loaded from Pocketbook")
-        else:
-            error_dialog(self.gui, "Can not load favorite statuses", "Column " + prefs["fav_lookup_name"] + " does not exist", show=True)
-        
+    def send_read(self):
+        self.run_sync_job("send_read", "Sending read statuses to Pocketbook")
+
+
+    def send_favorite(self):
+        self.run_sync_job("send_favorite", "Sending favorite statuses to Pocketbook")
+
+
+    def send_ratings(self):
+        self.run_sync_job("send_ratings", "Sending ratings to Pocketbook (KOReader)")
+
+
+    def send_reviews(self):
+        self.run_sync_job("send_reviews", "Sending ratings to Pocketbook (KOReader)")
+
+
+
+    def load_all(self):
+        self.run_sync_job("load_all", "Loading all metadata from Pocketbook")
+
+
+
+    def load_collections(self):
+        self.run_sync_job("load_collections", "Loading collections from Pocketbook")
+
+
+    def load_read(self):
+        self.run_sync_job("load_read", "Loading read statuses from Pocketbook")
+
+
+    def load_favorite(self):
+        self.run_sync_job("load_favorite", "Loading favorite statuses from Pocketbook")
+
+
+    def load_ratings(self):
+        self.run_sync_job("load_ratings", "Loading favorite statuses from Pocketbook")
+
+
+    def load_reviews(self):
+        self.run_sync_job("load_reviews", "Loading favorite statuses from Pocketbook")
+
+
+
+    def sync_position(self):
+        self.run_sync_job("sync_position", "Syncing with reading positions")
+
+
+    def force_position(self):
+        self.run_sync_job("force_position", "Syncing with reading positions")
+
+
+    def extract_annotations(self):
+        self.run_sync_job("extract_annotations", "Extracting annotations")
+
+
+
+
 
     
     # Run job to sync any metadata
         
-    def run_sync_job(self, command, desc, done_msg):
+    def run_sync_job(self, command, desc):
+        device_DB_path = self.get_device_DB_path()
+        if device_DB_path:
+            print("PB-COLLECTIONS: Start syncing metadata")
 
-        # data in a dict where all additianal variables used by a job are stored
-        data = {}        
-        data["dbpath"] = self.gui.current_db.library_path
-        data["device"] = self.gui.library_view.model().device_connected
-        data["device_DB_path"] = self.get_device_DB_path()
-        data["device_storages"] = self.get_device_storages()
-        data["has_read_column"] = self.has_read_column
-        data["has_fav_column"] = self.has_fav_column
-        data["has_shelf_column"] = self.has_shelf_column
-
-        args = ['calibre_plugins.pocketbook_collections.main','sync_metadata', (data, command, done_msg)]
-        self.gui.job_manager.run_job(self.sync_done, "arbitrary", args=args, description=desc)
+            # data in a dict where all additianal variables used by a job are stored
+            data = {
+                "dbpath": self.gui.current_db.library_path,
+                "device_DB_path": device_DB_path,
+                "device_storages": self.get_device_storages()
+            }        
+            
+            args = ['calibre_plugins.pocketbook_collections.main', command, (data, )]
+            self.gui.job_manager.run_job(self.Dispatcher(self.sync_done), "arbitrary", args=args, description=desc)
+        else:
+            error_dialog(self.gui, "Database not found", "No device collected or current device is not supported.", show=True)
 
 
     # After the job finished we must update downloaded metadata in calibre. It should not be updated from inside the job, because then GUI would not be refreshed.
 
     def sync_done(self, job):
-        to_load, done_msg = job.result
+        result = job.result
+        try:
+            to_load, done_msg = result
+            if to_load == "error":
+                error_dialog(self.gui, "Error", done_msg, show=True)
+            elif to_load == None:
+                pass
+            else:
+                
 
-        print("start updating Calibre metadata")
+                if "read" in to_load and len(to_load["read"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["read_lookup_name"], to_load["read"])
 
-        for obj in to_load["read"]:
-            #print("read")
-            #print(obj)
-            self.gui.current_db.new_api.set_field(prefs["read_lookup_name"], obj)
-            self.gui.iactions['Edit Metadata'].refresh_gui(list(obj.keys()), covers_changed=False)
+                if "fav" in to_load and len(to_load["fav"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["fav_lookup_name"], to_load["fav"])
 
-        for obj in to_load["fav"]:
-            #print("fav")
-            #print(obj)
-            self.gui.current_db.new_api.set_field(prefs["fav_lookup_name"], obj)
-            self.gui.iactions['Edit Metadata'].refresh_gui(list(obj.keys()), covers_changed=False)
+                if "shelf" in to_load and len(to_load["shelf"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["shelf_lookup_name"], to_load["shelf"])
 
-        for obj in to_load["shelf"]:
-            print(obj)
-            self.gui.current_db.new_api.set_field(prefs["shelf_lookup_name"], obj)
-            self.gui.iactions['Edit Metadata'].refresh_gui(list(obj.keys()), covers_changed=False)
+                if "ratings" in to_load and len(to_load["ratings"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["rating_lookup_name"], to_load["ratings"])
 
-        print(done_msg)
+                if "reviews" in to_load and len(to_load["reviews"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["review_lookup_name"], to_load["reviews"])
+
+                if "annotations" in to_load and len(to_load["annotations"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["an_lookup_name"], to_load["annotations"])
+
+                if "position" in to_load and len(to_load["position"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["position_lookup_name"], to_load["position"])
+
+                if "books_to_refresh" in to_load and len(to_load["books_to_refresh"]) > 0: 
+                    self.gui.iactions['Edit Metadata'].refresh_gui(to_load["books_to_refresh"], covers_changed=False)
+
+            print(done_msg)
+            print("PB-COLLECTIONS: End syncing metadata")
+        except:
+            error_dialog(self.gui, "Error", "Unknown error.", show=True)
+
+
+
+            
+
 
 
 
