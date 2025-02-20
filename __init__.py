@@ -6,7 +6,7 @@ __docformat__ = 'restructuredtext en'
 from calibre.customize import InterfaceActionBase
 
 PLUGIN_NAME = 'Pocketbook Collections'
-PLUGIN_VERSION_TUPLE = (2, 0, 0)
+PLUGIN_VERSION_TUPLE = (2, 1, 0)
 PLUGIN_VERSION = '.'.join([str(x) for x in PLUGIN_VERSION_TUPLE])
 
 

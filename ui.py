@@ -31,7 +31,8 @@ PLUGIN_ICONS = ['images/pocketbook.png',
                 'images/rating.png',
                 'images/edit_input.png',
                 'images/edit-redo.png',
-                'images/highlight.png'
+                'images/highlight.png',
+                'images/sort.png'
                 ]
 
 
@@ -91,6 +92,8 @@ class InterfacePlugin(InterfaceAction):
 
         main_menu.addAction(self.get_icon('auto-reload'), ('Sync reading positions'), self.sync_position)
         main_menu.addAction(self.get_icon('edit-redo'), ('Force update reading positions from Calibre'), self.force_position)
+
+        main_menu.addAction(self.get_icon('sort'), ('Sort by custom series'), self.sort)
 
         
 
@@ -160,6 +163,9 @@ class InterfacePlugin(InterfaceAction):
 
     def extract_annotations(self):
         self.run_sync_job("extract_annotations", "Extracting annotations")
+
+    def sort(self):
+        self.run_sync_job("sort", "Sorting by custom series")
 
 
 

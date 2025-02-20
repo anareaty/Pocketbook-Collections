@@ -54,6 +54,9 @@ def set_globals(data):
     db_row_factory = lambda cursor, row: {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
+    global kr_collections
+    kr_collections = None
+
     global sync_read
     sync_read = None
     if prefs['read_lookup_name'] in current_db.all_field_keys():
@@ -402,7 +405,7 @@ def load_all(data):
                     book.get_kr_metadata()
                 if book.book_row:
                     if sync_shelf:
-                        if pref_shelf_kr:
+                        if not pref_shelf_kr:
                             to_load_shelf = book.load_book_collections(db)
                         else:
                             to_load_shelf = book.load_shelf_kr()
@@ -779,6 +782,48 @@ def extract_annotations(data):
 
 
 
+
+
+def sort(data):
+    set_globals(data)
+    db = prepare_explorer_db()
+    bookLists = calibreAPI.all_field_ids("#lists")
+    timestamp = None
+    
+    for list in bookLists:
+        books = calibreAPI.books_for_field("#lists", list)
+
+
+        for book_id in books:
+            firstBook = SyncBook(book_id)
+            if firstBook.device_book_metadata:
+                firstBook.process_db(db)
+                timestamp = firstBook.get_ts_added(db)
+                if timestamp != None:
+                    break
+
+        if timestamp == None:
+            timestamp = int(time.time())
+
+        for calibre_book_ID in books:
+            index = int(calibreAPI.field_for("#lists_index", calibre_book_ID))
+            fake_ts_added = str(timestamp + len(books) - index)
+
+            book = SyncBook(calibre_book_ID)
+            if book.device_book_metadata:
+                book.process_db(db)
+                book.change_ts_added(db, fake_ts_added)
+    
+
+
+
+
+
+
+
+
+    done_msg = "Synced"
+    return None, done_msg 
 
 
 
@@ -1158,12 +1203,12 @@ class SyncBook():
             # If the collection in reader does not exist we must create it
             if readerBookShelfID == None:
                 # First create the collection itself
-                cursor.execute("INSERT INTO bookshelfs(name, is_deleted, ts) VALUES('" + calibreBookShelfName + "', 0, " + str(self.lastModTS) + ")")
+                cursor.execute("INSERT OR IGNORE INTO bookshelfs(name, is_deleted, ts) VALUES('" + calibreBookShelfName + "', 0, " + str(self.lastModTS) + ")")
                 db.commit()
                 readerBookShelfID = cursor.execute("SELECT id FROM bookshelfs WHERE name = '" + calibreBookShelfName +"'").fetchone()["id"]
 
                 # The add book to collection
-                cursor.execute("INSERT INTO bookshelfs_books(bookshelfid, bookid, ts, is_deleted) VALUES(" + str(readerBookShelfID) + ", " + self.reader_book_ID + ", " + str(self.lastModTS) + ", 0)")
+                cursor.execute("INSERT OR IGNORE INTO bookshelfs_books(bookshelfid, bookid, ts, is_deleted) VALUES(" + str(readerBookShelfID) + ", " + self.reader_book_ID + ", " + str(self.lastModTS) + ", 0)")
                 db.commit()
                 
             # If the collection in reader does exist, we must check if it has the book
@@ -1402,6 +1447,10 @@ class SyncBook():
                 self.kr_metadata["summary"] = {}
             if "rating" not in self.kr_metadata["summary"] or self.kr_metadata["summary"]["rating"] != rating:
                 self.kr_metadata["summary"]["rating"] = rating
+                self.update_kr_sidecar()
+        else:
+            if self.kr_metadata and "summary" in self.kr_metadata and "rating" in self.kr_metadata["summary"]:
+                self.kr_metadata["summary"].pop("rating")
                 self.update_kr_sidecar()
 
 
@@ -1842,7 +1891,7 @@ class SyncBook():
     def get_kr_annotations(self):
         self.get_kr_metadata()
 
-        if self.kr_metadata:
+        if self.kr_metadata and "annotations" in self.kr_metadata:
             annotations = self.kr_metadata["annotations"]
             pages = self.kr_metadata["doc_pages"]
 
@@ -2393,3 +2442,20 @@ class SyncBook():
         return None
 
 
+
+    def change_ts_added(self, db, ts):
+        cursor = db.cursor()
+        cursor.execute("UPDATE books_impl SET ts_added = '" + ts + "' WHERE id = " + self.reader_book_ID)
+        db.commit()
+
+    
+    def get_ts_added(self, db):
+        ts = int(time.time())
+        cursor = db.cursor()
+        data_row = cursor.execute("SELECT ts_added FROM books_impl WHERE id = " + self.reader_book_ID).fetchone()
+        if data_row and "ts_added" in data_row:
+            ts = int(data_row["ts_added"])
+        return ts
+
+
+        
