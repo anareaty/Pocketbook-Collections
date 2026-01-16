@@ -92,6 +92,17 @@ def set_globals(data):
     if prefs['rating_lookup_name'] in current_db.all_field_keys():
         sync_rating = True
 
+
+    global sync_percent
+    sync_percent = None
+    if prefs['percent_lookup_name'] in current_db.all_field_keys():
+        sync_percent = True
+
+    global sync_pages
+    sync_pages = None
+    if prefs['pages_lookup_name'] in current_db.all_field_keys():
+        sync_pages = True
+
     global sync_review
     sync_review = None
     if prefs['review_lookup_name'] in current_db.all_field_keys():
@@ -139,7 +150,7 @@ def set_globals(data):
 
     global sync_statuses
     sync_statuses = None
-    if sync_read or sync_fav:
+    if sync_read or sync_fav or sync_pages:
         sync_statuses = True
     
     global sync_all
@@ -184,14 +195,27 @@ def send_all(data):
     except:
         return "error", "Can not reach device metadata, it is probably still updating. Try again later."
 
+
+    to_load = {
+        "position": {},
+        "books_to_refresh": []
+    }
+
+
     if sync_all:
-        if sync_db:
-            db = prepare_explorer_db()
+        db = prepare_explorer_db()
         if sync_shelf:
             create_shelfs_dicts(db)
         if sync_kr_collections:
             get_kr_collections()
             create_missing_kr_collections()
+        if sync_position:
+            if sync_pos_pb:
+                db = prepare_explorer_db()
+            if sync_pos_cr:
+                get_cr3hist_path()
+
+
         calibre_book_IDs = calibreAPI.all_book_ids()
 
         for calibre_book_ID in calibre_book_IDs:
@@ -216,12 +240,63 @@ def send_all(data):
                 if sync_review:
                     book.send_review_kr()
 
-        if sync_db:
-            db.close()
+            if book.device_book_metadata:
+                positions = {}
+                if sync_pos_pb:
+                    book.process_db(db)
+                    to_load_position_pb = book.pb_sync_position(db)
+                    if to_load_position_pb:
+                        positions["pb"] = to_load_position_pb
+                if sync_pos_kr:
+                    book.get_kr_metadata()
+                    to_load_position_kr = book.kr_sync_position()
+                    if to_load_position_kr:
+                        positions["kr"] = to_load_position_kr
+                if sync_pos_cr:
+                    to_load_position_cr = book.cr_sync_position()
+                    if to_load_position_cr:
+                        positions["cr"] = to_load_position_cr
+
+                if len(positions) > 0:
+                    to_load["position"][calibre_book_ID] = str(positions)
+                    to_load["books_to_refresh"].append(calibre_book_ID)
+
+        
+
+        bookLists = calibreAPI.all_field_ids("#lists")
+        timestamp = None
+        
+        for list in bookLists:
+            books = calibreAPI.books_for_field("#lists", list)
+
+            for book_id in books:
+                firstBook = SyncBook(book_id)
+                if firstBook.device_book_metadata:
+                    firstBook.process_db(db)
+                    timestamp = firstBook.get_ts_added(db)
+                    if timestamp != None:
+                        break
+
+            if timestamp == None:
+                timestamp = int(time.time())
+
+            for calibre_book_ID in books:
+                index = int(calibreAPI.field_for("#lists_index", calibre_book_ID))
+                fake_ts_added = str(timestamp + len(books) - index)
+
+                book = SyncBook(calibre_book_ID)
+                if book.device_book_metadata:
+                    book.process_db(db)
+                    book.change_ts_added(db, fake_ts_added)
+
+
+        db.close()
         if kr_collections:
             update_kr_collections(kr_collections)
     done_msg = "Sending metadata finished"
-    return None, done_msg
+
+    
+    return to_load, done_msg 
 
 
 
@@ -377,18 +452,29 @@ def load_all(data):
         "read": {},
         "fav": {},
         "ratings": {},
+        "percents": {},
+        "pages": {},
         "reviews": {},
+        "position": {},
+        "annotations": {},
         "books_to_refresh": []
     }
 
 
     if sync_all:
-        if sync_db:
-            db = prepare_explorer_db()
+        db = prepare_explorer_db()
         if sync_shelf:
             create_shelfs_dicts(db)
         if sync_kr_collections:
             get_kr_collections()
+        if sync_position:
+            if sync_pos_pb:
+                db = prepare_explorer_db()
+            if sync_pos_cr:
+                get_cr3hist_path()
+        if load_an_cr:
+            get_cr3hist_path()
+
         calibre_book_IDs = calibreAPI.all_book_ids()
 
         for calibre_book_ID in calibre_book_IDs:
@@ -398,6 +484,8 @@ def load_all(data):
                 to_load_read = None
                 to_load_fav = None
                 to_load_rating = None
+                to_load_percent = None
+                to_load_pages = None
                 to_load_review = None
                 if sync_db:
                     book.process_db(db)
@@ -415,6 +503,8 @@ def load_all(data):
                             to_load_read = to_load_statuses["read"]
                         if to_load_statuses["fav"]:
                             to_load_fav = to_load_statuses["fav"]
+                        if to_load_statuses["pages"]:
+                            to_load_pages = to_load_statuses["pages"]
                 if sync_read_kr:
                     book.get_kr_metadata()
                     to_load_read_kr = book.load_read_kr()
@@ -424,10 +514,12 @@ def load_all(data):
                     to_load_fav = book.load_fav_kr()
                 if sync_rating:
                     to_load_rating = book.load_rating_kr()
+                if sync_percent:
+                    to_load_percent = book.load_percent_kr()
                 if sync_review:
                     to_load_review = book.load_review_kr()
 
-                if to_load_shelf or to_load_read or to_load_fav or to_load_rating or to_load_review:
+                if to_load_shelf or to_load_read or to_load_fav or to_load_rating or to_load_percent or to_load_review:
                     to_load["books_to_refresh"].append(calibre_book_ID)
                 if to_load_shelf:
                     to_load["shelf"][calibre_book_ID] = to_load_shelf
@@ -435,14 +527,56 @@ def load_all(data):
                     to_load["read"][calibre_book_ID] = to_load_read["status"]
                 if to_load_fav:
                     to_load["fav"][calibre_book_ID] = to_load_fav["status"]
+                if to_load_pages:
+                    to_load["pages"][calibre_book_ID] = to_load_pages["status"]
                 if to_load_rating:
                     to_load["ratings"][calibre_book_ID] = to_load_rating
+                if to_load_percent:
+                    to_load["percents"][calibre_book_ID] = to_load_percent
                 if to_load_review:
                     to_load["reviews"][calibre_book_ID] = to_load_review
-                  
 
-        if sync_db:
-            db.close()
+                
+                positions = {}
+                if sync_pos_pb:
+                    book.process_db(db)
+                    to_load_position_pb = book.pb_sync_position(db)
+                    if to_load_position_pb:
+                        positions["pb"] = to_load_position_pb
+                if sync_pos_kr:
+                    book.get_kr_metadata()
+                    to_load_position_kr = book.kr_sync_position()
+                    if to_load_position_kr:
+                        positions["kr"] = to_load_position_kr
+                if sync_pos_cr:
+                    to_load_position_cr = book.cr_sync_position()
+                    if to_load_position_cr:
+                        positions["cr"] = to_load_position_cr
+
+                if len(positions) > 0:
+                    to_load["position"][calibre_book_ID] = str(positions)
+                    to_load["books_to_refresh"].append(calibre_book_ID)
+                
+
+                if load_an_pb:
+                    book.get_pb_annotations(db)
+                if load_an_kr:
+                    book.get_kr_annotations()
+                if load_an_cr:
+                    book.get_cr_annotations()
+                if len(book.new_annotations) > 0:
+                    book.generate_annotations_html()
+
+            if book.annotations_html:
+                try:
+                    book.annotations_html = book.annotations_html.decode("utf-8")
+                except:
+                    pass
+
+                to_load["annotations"][calibre_book_ID] = book.annotations_html
+                to_load["books_to_refresh"].append(calibre_book_ID)
+
+        db.close()
     done_msg = "Sending metadata finished"
     return to_load, done_msg
 
@@ -588,7 +722,35 @@ def load_favorite(data):
 
 
 
+def load_pages(data):
+    
+    try:
+        set_globals(data)
+    except:
+        return "error", "Can not reach device metadata, it is probably still updating. Try again later."
+    
+    to_load = {
+        "pages": {},
+        "books_to_refresh": []
+    }
+    
+    if sync_pages:
+        db = prepare_explorer_db()
+        calibre_book_IDs = calibreAPI.all_book_ids()
 
+        for calibre_book_ID in calibre_book_IDs:
+            book = SyncBook(calibre_book_ID)
+            if book.device_book_metadata:
+                to_load_pages = None
+                book.process_db(db)
+                if book.book_row:
+                    to_load_pages = book.load_pages_status(db)
+                if to_load_pages:
+                    to_load["pages"][calibre_book_ID] = to_load_pages["status"]
+                    to_load["books_to_refresh"].append(calibre_book_ID)
+        db.close()
+    done_msg = "Loaded favorite"
+    return to_load, done_msg
 
 
 
@@ -649,6 +811,36 @@ def load_ratings(data):
                     to_load["books_to_refresh"].append(calibre_book_ID)
                     
     done_msg = "Loaded ratings"
+    return to_load, done_msg
+
+
+
+
+
+
+
+def load_percents(data):
+    set_globals(data)
+
+    to_load = {
+        "percents": {},
+        "books_to_refresh": []
+    }
+
+    if sync_rating:
+        calibre_book_IDs = calibreAPI.all_book_ids()
+
+        for calibre_book_ID in calibre_book_IDs:
+            book = SyncBook(calibre_book_ID)
+            if book.device_book_metadata:
+                to_load_percent = None
+                book.get_kr_metadata()
+                to_load_percent = book.load_percent_kr()
+                if to_load_percent:
+                    to_load["percents"][calibre_book_ID] = to_load_percent
+                    to_load["books_to_refresh"].append(calibre_book_ID)
+                    
+    done_msg = "Loaded percents"
     return to_load, done_msg
 
 
@@ -814,7 +1006,7 @@ def sort(data):
                 book.process_db(db)
                 book.change_ts_added(db, fake_ts_added)
     
-
+    db.close()
 
 
 
@@ -900,6 +1092,8 @@ def create_shelfs_dicts(db):
     if calibreShelfIDs == None:
         calibreShelfIDs = []
 
+
+
     readerShelfRows = cursor.execute("SELECT id, name FROM bookshelfs").fetchall()
 
     for calibreShelfID in calibreShelfIDs:
@@ -918,6 +1112,32 @@ def create_shelfs_dicts(db):
 
         shelf_dicts["shelfsNameToReader"][shelfName] = readerShelfID
             
+    
+    
+    if prefs["extra_shelf_lookup_name"]:
+        calibreExtraShelfIDs = calibreAPI.all_field_ids(prefs["extra_shelf_lookup_name"])
+        if calibreExtraShelfIDs == None:
+            calibreExtraShelfIDs = []
+
+        for calibreShelfID in calibreExtraShelfIDs:
+            shelfName = calibreAPI.get_item_name(prefs["extra_shelf_lookup_name"], calibreShelfID)
+            readerShelfID = None
+
+            i = 0
+            while i < len(readerShelfRows):
+                readerShelf = readerShelfRows[i]
+                if readerShelf['name'] == shelfName:
+                    readerShelfID = readerShelf["id"]
+                    shelf_dicts["shelfsReaderToCalibre"][readerShelfID] = {"calibreShelfID": calibreShelfID, "name": shelfName}
+                    del readerShelfRows[i]
+                else:
+                    i += 1
+
+            shelf_dicts["shelfsNameToReader"][shelfName] = readerShelfID
+
+
+
+    
     for readerShelf in readerShelfRows:
         readerShelfID = readerShelf["id"]
         shelfName = readerShelf["name"]
@@ -1190,7 +1410,18 @@ class SyncBook():
 
         # Find the list of existing collections names for the book in Calibre
         calibreBookShelfNames = calibreAPI.field_for(prefs["shelf_lookup_name"], self.calibre_book_ID, default_value=[])
-    
+
+
+
+
+        if prefs["extra_shelf_lookup_name"]:
+            calibreExtraBookShelfNames = calibreAPI.field_for(prefs["extra_shelf_lookup_name"], self.calibre_book_ID, default_value=[])
+            calibreBookShelfNames = calibreBookShelfNames + calibreExtraBookShelfNames
+
+
+
+
+
         # Find the list of existing collections objects for the book on reader
         readerBookShelfs = cursor.execute("SELECT bookshelfid, is_deleted, ts FROM bookshelfs_books WHERE bookid = " + self.reader_book_ID).fetchall()
 
@@ -1485,6 +1716,12 @@ class SyncBook():
         # Find the list of existing collections names for the book in Calibre
         calibreBookShelfNames = calibreAPI.field_for(prefs["shelf_lookup_name"], self.calibre_book_ID, default_value=[])
 
+
+        calibreExtraBookShelfNames = []
+        if prefs["extra_shelf_lookup_name"]:
+            calibreExtraBookShelfNames = calibreAPI.field_for(prefs["extra_shelf_lookup_name"], self.calibre_book_ID, default_value=[])
+
+
         # Create the editable copy of the collections in Calibre
         calibreBookShelfNamesList = list(calibreBookShelfNames)
 
@@ -1535,8 +1772,20 @@ class SyncBook():
                 if calibreBookShelfName == shelfName:
                     calibreShelf = calibreBookShelfName
 
+
+
+            # Check in extra collections in Calibre
+
+            calibreExtraShelf = None
+            for calibreBookShelfName in calibreExtraBookShelfNames:
+                if calibreBookShelfName == shelfName:
+                    calibreExtraShelf = calibreBookShelfName
+
+
+
+
             # If collection is not in Calibre and not marked as deleted, add collection to Calibre collections list
-            if calibreShelf == None and readerBookShelfRow["is_deleted"] != 1:
+            if calibreShelf == None and calibreExtraShelf == None and readerBookShelfRow["is_deleted"] != 1:
                 update_shelfs_in_Calibre = True
                 calibreBookShelfNamesList.append(shelfName)
             # If collection is in Calibre, it is already processed, so do nothing.
@@ -1684,6 +1933,37 @@ class SyncBook():
 
 
 
+    def load_pages_status(self, db):
+        
+        to_load_pages = None
+
+        if sync_pages:
+            cursor = db.cursor()
+
+            # Find favorite status in reader
+            statusRow = cursor.execute("SELECT bookid, npage FROM books_settings WHERE bookid = " + self.reader_book_ID + " AND profileid = " + profile_ID).fetchone()
+
+            
+
+            # If status exist, check the status in Calibre
+            calibre_pages = calibreAPI.field_for(prefs["pages_lookup_name"], self.calibre_book_ID)
+            pages = 0
+            if calibre_pages: 
+                pages = calibre_pages
+
+            if statusRow:
+                # If status in Calibre is different from reader,  save status to update Calibre
+                if statusRow["npage"] and pages != str(statusRow["npage"]):
+                    pages = str(statusRow["npage"])
+                    to_load_pages = {"status": pages}
+                    
+            
+        return to_load_pages
+
+
+
+
+
 
     def load_fav_kr(self):
         to_load_fav = None
@@ -1709,15 +1989,18 @@ class SyncBook():
         cursor = db.cursor()
         to_load_statuses = {
             "read": None,
-            "fav": None
+            "fav": None,
+            "pages": None
         }
 
         # Find statuses in reader
-        statusRow = cursor.execute("SELECT bookid, completed, favorite FROM books_settings WHERE bookid = " + self.reader_book_ID + " AND profileid = " + profile_ID).fetchone()
+        statusRow = cursor.execute("SELECT bookid, completed, favorite, npage FROM books_settings WHERE bookid = " + self.reader_book_ID + " AND profileid = " + profile_ID).fetchone()
 
         # If at least one status exist, check statuses in Calibre
         completed = "0"
         favorite = "0"
+        calibre_pages = 0
+        pages = 0
 
         if sync_read:
             read = calibreAPI.field_for(prefs["read_lookup_name"], self.calibre_book_ID)
@@ -1728,6 +2011,14 @@ class SyncBook():
             fav = calibreAPI.field_for(prefs["fav_lookup_name"], self.calibre_book_ID)
             if fav: 
                 favorite = "1"
+
+        if sync_pages:
+            calibre_pages = calibreAPI.field_for(prefs["pages_lookup_name"], self.calibre_book_ID)
+            if calibre_pages:
+                calibre_pages = int(calibre_pages)
+            else: 
+                calibre_pages = 0
+
 
         if statusRow:
             loadStatusFromDevice = False
@@ -1740,6 +2031,10 @@ class SyncBook():
             if sync_fav and favorite != str(statusRow["favorite"]):
                 favorite = str(statusRow["favorite"])
                 loadStatusFromDevice = True
+
+            if sync_pages and statusRow["npage"] and calibre_pages != statusRow["npage"]:
+                pages = statusRow["npage"]
+                to_load_statuses["pages"] = {"status": pages}
             
             if loadStatusFromDevice:
                 if str(completed) == "1":
@@ -1752,8 +2047,12 @@ class SyncBook():
                 else:
                     fav = False
 
+
+            
+
                 to_load_statuses["read"] = {"status": read}
                 to_load_statuses["fav"] = {"status": fav}
+                
         
         # If statuses in reader not exist delete status in Calibre
         else:
@@ -1783,6 +2082,36 @@ class SyncBook():
                     if rating != calibre_rating:
                         to_load_rating = rating
         return to_load_rating
+
+
+
+
+
+
+
+
+
+
+
+
+    def load_percent_kr(self):
+        to_load_percent = None
+        if self.kr_metadata:
+            if "summary" in self.kr_metadata:
+
+                if "status" in self.kr_metadata["summary"]:
+                    status = self.kr_metadata["summary"]["status"]
+                    percent = 0
+                    if status == "complete":
+                        percent = 100
+                    else:
+                        percent = self.kr_metadata["percent_finished"]
+                        if percent:
+                            percent = int(percent * 100)
+                    calibre_percent = calibreAPI.field_for(prefs['percent_lookup_name'], self.calibre_book_ID, default_value=None)
+                    if percent != calibre_percent:
+                        to_load_percent = percent
+        return to_load_percent
 
 
 
@@ -2173,7 +2502,9 @@ class SyncBook():
                 calibre_position_text = calibre_position_kr.split("_TIMESTAMP_")[0]
                 calibre_ts = int(calibre_position_kr.split("_TIMESTAMP_")[1])
 
-        if self.kr_metadata:
+
+        if self.kr_metadata and "last_xpointer" in self.kr_metadata:
+            
             position = self.kr_metadata["last_xpointer"]
             reader_ts = int(os.path.getmtime(self.sidecar_path))
             reader_position_string = position + "_TIMESTAMP_" + str(reader_ts)
@@ -2184,12 +2515,14 @@ class SyncBook():
         elif not os.path.exists(self.sidecar_path) and calibre_position_kr:
             self.generate_kr_sidecar(calibre_position_text)
         
-        elif self.kr_metadata and position == None and calibre_position_kr:
+        elif self.kr_metadata and "last_xpointer" in self.kr_metadata and position == None and calibre_position_kr:
+            
             self.kr_metadata["last_xpointer"] = calibre_position_text
             self.update_kr_sidecar()
 
-        elif position and calibre_position_kr and calibre_position_kr != reader_position_string:
+        elif position and calibre_position_kr and calibre_position_kr != reader_position_string and "last_xpointer" in self.kr_metadata:
             if calibre_ts > reader_ts:
+                
                 self.kr_metadata["last_xpointer"] = calibre_position_text
                 self.update_kr_sidecar()
             elif calibre_ts < reader_ts:

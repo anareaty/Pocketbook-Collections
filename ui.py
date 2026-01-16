@@ -9,6 +9,7 @@ from calibre_plugins.pocketbook_collections.config import prefs
 from calibre.devices.usbms.driver import debug_print
 from calibre.gui2 import error_dialog
 import os
+import re
 
 try:
     from qt.core import QMenu
@@ -29,6 +30,8 @@ PLUGIN_ICONS = ['images/pocketbook.png',
                 'images/heart.png',
                 'images/auto-reload.png',
                 'images/rating.png',
+                'images/view.png',
+                'images/book.png',
                 'images/edit_input.png',
                 'images/edit-redo.png',
                 'images/highlight.png',
@@ -85,7 +88,10 @@ class InterfacePlugin(InterfaceAction):
         loadMenu.addAction(self.get_icon('catalog'), ('Load collections'), self.load_collections)
         loadMenu.addAction(self.get_icon('ok'), ('Load read statuses'), self.load_read)
         loadMenu.addAction(self.get_icon('heart'), ('Load favorite statuses'), self.load_favorite)
+        loadMenu.addAction(self.get_icon('view'), ('Load pages (KOReader)'), self.load_pages)
+        loadMenu.addAction(self.get_icon('view'), ('Load percents (KOReader)'), self.load_percents)
         loadMenu.addAction(self.get_icon('rating'), ('Load ratings (KOReader)'), self.load_ratings)
+        
         loadMenu.addAction(self.get_icon('edit_input'), ('Load reviews (KOReader)'), self.load_reviews)
 
         main_menu.addAction(self.get_icon('highlight'), ('Extract annotations'), self.extract_annotations)
@@ -145,7 +151,13 @@ class InterfacePlugin(InterfaceAction):
 
 
     def load_ratings(self):
-        self.run_sync_job("load_ratings", "Loading favorite statuses from Pocketbook")
+        self.run_sync_job("load_ratings", "Loading ratings from Pocketbook")
+
+    def load_percents(self):
+        self.run_sync_job("load_percents", "Loading percents from Pocketbook")
+
+    def load_pages(self):
+        self.run_sync_job("load_pages", "Loading pages from Pocketbook")
 
 
     def load_reviews(self):
@@ -217,6 +229,12 @@ class InterfacePlugin(InterfaceAction):
                 if "ratings" in to_load and len(to_load["ratings"]) > 0:
                     self.gui.current_db.new_api.set_field(prefs["rating_lookup_name"], to_load["ratings"])
 
+                if "percents" in to_load and len(to_load["percents"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["percent_lookup_name"], to_load["percents"])
+
+                if "pages" in to_load and len(to_load["pages"]) > 0:
+                    self.gui.current_db.new_api.set_field(prefs["pages_lookup_name"], to_load["pages"])
+
                 if "reviews" in to_load and len(to_load["reviews"]) > 0:
                     self.gui.current_db.new_api.set_field(prefs["review_lookup_name"], to_load["reviews"])
 
@@ -255,7 +273,9 @@ class InterfacePlugin(InterfaceAction):
 
     def get_device_DB_path(self):
         device = self.gui.library_view.model().device_connected
-        if device:
+        if device:  
+
+
             devicePath = self.gui.device_manager.connected_device._main_prefix
 
             for version in (3, 2):
@@ -271,6 +291,7 @@ class InterfacePlugin(InterfaceAction):
         storages = {}
         device = self.gui.library_view.model().device_connected
         if device:
+
             main_storage = self.gui.device_manager.connected_device._main_prefix
             storages["main"] = main_storage
 

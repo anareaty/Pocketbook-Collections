@@ -19,11 +19,14 @@ from calibre.utils.config import JSONConfig
 prefs = JSONConfig('plugins/pocketbook_collections')
 
 prefs.defaults['shelf_lookup_name'] = None
+prefs.defaults['extra_shelf_lookup_name'] = None
 prefs.defaults['an_lookup_name'] = None
 prefs.defaults['read_lookup_name'] = None
 prefs.defaults['fav_lookup_name'] = None
 prefs.defaults['position_lookup_name'] = None
+prefs.defaults['pages_lookup_name'] = None
 prefs.defaults['rating_lookup_name'] = None
+prefs.defaults['percent_lookup_name'] = None
 prefs.defaults['review_lookup_name'] = None
 
 prefs.defaults['sync_pb_pos'] = True
@@ -76,14 +79,30 @@ class ConfigWidget(QWidget):
         main_layout.addWidget(self.shelf_combo, 0, 1)
 
 
+        extra_shelf_label = QLabel('Extra collections column:')
+        extra_shelf_label.setWordWrap(True)
+        extra_shelf_label.setToolTip("Use if you want to add collections from two columns. This column wil not be synced back from the device.")
+        main_layout.addWidget(extra_shelf_label, 1, 0)
+        self.extra_shelf_combo = QComboBox(self)
+        self.extra_shelf_combo.addItems(self.get_columns("text", custom=True, multiple=True))
+        self.extra_shelf_combo.setCurrentIndex(self.get_index(prefs['extra_shelf_lookup_name']))
+        extra_shelf_label.setBuddy(self.extra_shelf_combo)
+        main_layout.addWidget(self.extra_shelf_combo, 1, 1)
+        extra_shelf_label.setToolTip("Use if you want to add collections from two columns. This column wil not be synced back from the device.")
+
+
+        
+
+
+
         read_label = QLabel('Read column:')
         read_label.setWordWrap(True)
-        main_layout.addWidget(read_label, 1, 0)
+        main_layout.addWidget(read_label, 2, 0)
         self.read_combo = QComboBox(self)
         self.read_combo.addItems(self.get_columns("bool", custom=True))
         self.read_combo.setCurrentIndex(self.get_index(prefs['read_lookup_name']))
         read_label.setBuddy(self.read_combo)
-        main_layout.addWidget(self.read_combo, 1, 1)
+        main_layout.addWidget(self.read_combo, 2, 1)
 
 
         fav_label = QLabel('Favorite column:')
@@ -92,8 +111,8 @@ class ConfigWidget(QWidget):
         self.fav_combo.addItems(self.get_columns("bool", custom=True))
         self.fav_combo.setCurrentIndex(self.get_index(prefs['fav_lookup_name']))
         fav_label.setBuddy(self.fav_combo)
-        main_layout.addWidget(fav_label, 2, 0)
-        main_layout.addWidget(self.fav_combo, 2, 1)
+        main_layout.addWidget(fav_label, 3, 0)
+        main_layout.addWidget(self.fav_combo, 3, 1)
 
 
 
@@ -104,8 +123,8 @@ class ConfigWidget(QWidget):
         self.an_combo.addItems(self.get_columns("comments", custom=True))
         self.an_combo.setCurrentIndex(self.get_index(prefs['an_lookup_name']))
         an_label.setBuddy(self.an_combo)
-        main_layout.addWidget(an_label, 3, 0)
-        main_layout.addWidget(self.an_combo, 3, 1)
+        main_layout.addWidget(an_label, 4, 0)
+        main_layout.addWidget(self.an_combo, 4, 1)
 
         position_label = QLabel('Column to sync reading positions:')
         position_label.setWordWrap(True)
@@ -113,16 +132,30 @@ class ConfigWidget(QWidget):
         self.position_combo.addItems(self.get_columns("comments", custom=True))
         self.position_combo.setCurrentIndex(self.get_index(prefs['position_lookup_name']))
         position_label.setBuddy(self.position_combo)
-        main_layout.addWidget(position_label, 4, 0)
-        main_layout.addWidget(self.position_combo, 4, 1)
+        main_layout.addWidget(position_label, 5, 0)
+        main_layout.addWidget(self.position_combo, 5, 1)
+
+
+
+        pages_label = QLabel('Column to sync percent with KOReader:')
+        pages_label.setWordWrap(True)
+        self.pages_combo = QComboBox(self)
+        self.pages_combo.addItems(self.get_columns("int", custom=False))
+        self.pages_combo.setCurrentIndex(self.get_index(prefs['pages_lookup_name']))
+        pages_label.setBuddy(self.pages_combo)
+        main_layout.addWidget(pages_label, 6, 0)
+        main_layout.addWidget(self.pages_combo, 6, 1)
+
+
+
 
         self.sync_pb_pos_checkbox = QCheckBox("Sync main Pocketbook app reading positions")
         self.sync_pb_pos_checkbox.setChecked(prefs['sync_pb_pos'])
-        main_layout.addWidget(self.sync_pb_pos_checkbox, 5, 0, 1, 2)
+        main_layout.addWidget(self.sync_pb_pos_checkbox, 7, 0, 1, 2)
 
         self.sync_pb_an_checkbox = QCheckBox("Load main Pocketbook app annotations")
         self.sync_pb_an_checkbox.setChecked(prefs['sync_pb_an'])
-        main_layout.addWidget(self.sync_pb_an_checkbox, 6, 0, 1, 2)
+        main_layout.addWidget(self.sync_pb_an_checkbox, 8, 0, 1, 2)
 
 
         # KOReader settings
@@ -171,6 +204,23 @@ class ConfigWidget(QWidget):
         rating_label.setBuddy(self.rating_combo)
         kr_layout.addWidget(rating_label, 7, 0)
         kr_layout.addWidget(self.rating_combo, 7, 1)
+
+
+
+
+        percent_label = QLabel('Column to sync percent with KOReader:')
+        percent_label.setWordWrap(True)
+        self.percent_combo = QComboBox(self)
+        self.percent_combo.addItems(self.get_columns("int", custom=False))
+        self.percent_combo.setCurrentIndex(self.get_index(prefs['percent_lookup_name']))
+        percent_label.setBuddy(self.percent_combo)
+        kr_layout.addWidget(percent_label, 8, 0)
+        kr_layout.addWidget(self.percent_combo, 8, 1)
+
+
+
+
+
         
         review_label = QLabel('Column to sync book review with KOReader:')
         review_label.setWordWrap(True)
@@ -178,8 +228,8 @@ class ConfigWidget(QWidget):
         self.review_combo.addItems(self.get_columns("comments", custom=True))
         self.review_combo.setCurrentIndex(self.get_index(prefs['review_lookup_name']))
         review_label.setBuddy(self.review_combo)
-        kr_layout.addWidget(review_label, 8, 0)
-        kr_layout.addWidget(self.review_combo, 8, 1)
+        kr_layout.addWidget(review_label, 9, 0)
+        kr_layout.addWidget(self.review_combo, 9, 1)
 
 
         # CoolReader settings
@@ -202,7 +252,11 @@ class ConfigWidget(QWidget):
         self.resize(self.sizeHint())
         
 
-        
+
+
+
+
+
 
 
     def get_columns(self, type, custom=True, multiple=False):
@@ -214,6 +268,7 @@ class ConfigWidget(QWidget):
         type_fields = ["None"]
         for field in fields:
             field_data = db.metadata_for_field(field)
+            
             if field_data['datatype'] == type and bool(field_data['is_multiple']) == multiple and field_data['name']:
                 index = len(type_fields)
                 type_fields.append(field_data['name'])
@@ -238,11 +293,21 @@ class ConfigWidget(QWidget):
     def save_settings(self):
 
         prefs['shelf_lookup_name'] = self.field_by_name[self.shelf_combo.currentText()]
+
+        if self.extra_shelf_combo.currentText() == self.shelf_combo.currentText():
+            prefs['extra_shelf_lookup_name'] = None
+        else:
+            prefs['extra_shelf_lookup_name'] = self.field_by_name[self.extra_shelf_combo.currentText()]
+
+
+        
         prefs['read_lookup_name'] = self.field_by_name[self.read_combo.currentText()]
         prefs['fav_lookup_name'] = self.field_by_name[self.fav_combo.currentText()]
         prefs['an_lookup_name'] = self.field_by_name[self.an_combo.currentText()]
         prefs['position_lookup_name'] = self.field_by_name[self.position_combo.currentText()]
+        prefs['pages_lookup_name'] = self.field_by_name[self.pages_combo.currentText()]
         prefs['rating_lookup_name'] = self.field_by_name[self.rating_combo.currentText()]
+        prefs['percent_lookup_name'] = self.field_by_name[self.percent_combo.currentText()]
         prefs['review_lookup_name'] = self.field_by_name[self.review_combo.currentText()]
         
         prefs['sync_pb_pos'] = self.sync_pb_pos_checkbox.isChecked()
