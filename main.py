@@ -1305,9 +1305,9 @@ class SyncBook():
 
             if book_format == "pdf":
                 title = calibreAPI.field_for("title", self.calibre_book_ID)
-                cursor.execute("UPDATE books_impl SET title = '" + title + "', author = '" + authors_string + "', firstauthor = '" + author_first + "', first_author_letter = '" + author_first_letter + "' WHERE id = " + self.reader_book_ID)
+                cursor.execute("UPDATE books_impl SET title = ?, author = ?, firstauthor = ?, first_author_letter = ? WHERE id = ?", (title,authors_string,author_first,author_first_letter,self.reader_book_ID) )
             else:
-                cursor.execute("UPDATE books_impl SET author = '" + authors_string + "', firstauthor = '" + author_first + "', first_author_letter = '" + author_first_letter + "' WHERE id = " + self.reader_book_ID)
+                cursor.execute("UPDATE books_impl SET author = ?, firstauthor = ?, first_author_letter = ? WHERE id = ?", (authors_string,author_first,author_first_letter,self.reader_book_ID))
             db.commit()
         
 

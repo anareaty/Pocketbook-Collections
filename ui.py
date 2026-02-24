@@ -61,7 +61,7 @@ class InterfacePlugin(InterfaceAction):
     # Set menus
         
     def rebuild_menus(self):
-        fm = self.gui.current_db.field_metadata.custom_field_metadata()
+        fm = self.gui.current_db.field_metadata.all_metadata()
         self.has_read_column = prefs["read_lookup_name"] in fm and fm[prefs["read_lookup_name"]]['datatype'] == 'bool'
         self.has_fav_column = prefs["fav_lookup_name"] in fm and fm[prefs["fav_lookup_name"]]['datatype'] == 'bool'
         self.has_shelf_column = prefs["shelf_lookup_name"] in fm and fm[prefs["shelf_lookup_name"]]['datatype'] == 'text'

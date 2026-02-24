@@ -73,7 +73,7 @@ class ConfigWidget(QWidget):
         shelf_label.setWordWrap(True)
         main_layout.addWidget(shelf_label, 0, 0)
         self.shelf_combo = QComboBox(self)
-        self.shelf_combo.addItems(self.get_columns("text", custom=True, multiple=True))
+        self.shelf_combo.addItems(self.get_columns("text", custom=False, multiple=True))
         self.shelf_combo.setCurrentIndex(self.get_index(prefs['shelf_lookup_name']))
         shelf_label.setBuddy(self.shelf_combo)
         main_layout.addWidget(self.shelf_combo, 0, 1)
